@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Flappy Turd</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at 20% 20%, #3a2f3d, #120b18) fixed;
+      color: #f4f1f0;
+    }
+    .card {
+      width: min(520px, 100%);
+      padding: 1.5rem;
+      background: rgba(16, 12, 22, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 18px;
+      box-shadow:
+        0 10px 50px rgba(0, 0, 0, 0.35),
+        inset 0 0 20px rgba(255, 255, 255, 0.02);
+      backdrop-filter: blur(8px);
+    }
+    h1 {
+      margin: 0 0 0.5rem;
+      font-size: clamp(1.8rem, 2vw, 2.2rem);
+      letter-spacing: 0.04em;
+      text-shadow: 0 4px 16px rgba(0,0,0,0.5);
+    }
+    canvas {
+      width: 100%;
+      aspect-ratio: 3 / 4;
+      border-radius: 12px;
+      background: linear-gradient(#66c5ff, #9ee0ff 40%, #9ee0ff 60%, #8cd230);
+      display: block;
+      margin: 1rem 0;
+      border: 1px solid rgba(0, 0, 0, 0.15);
+      box-shadow: inset 0 4px 18px rgba(0,0,0,0.25);
+      image-rendering: pixelated;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+    p {
+      margin: 0.25rem 0;
+      line-height: 1.5;
+      font-size: 0.95rem;
+    }
+    small {
+      opacity: 0.75;
+      font-size: 0.8rem;
+    }
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem 1rem;
+      font-size: 0.9rem;
+      opacity: 0.85;
+    }
+    .btn-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+    button {
+      border: none;
+      border-radius: 999px;
+      padding: 0.5rem 1rem;
+      font-size: 0.9rem;
+      font-weight: 600;
+      background: #f97316;
+      color: #fff;
+      cursor: pointer;
+      box-shadow: 0 5px 15px rgba(249, 115, 22, 0.35);
+      transition: transform 150ms ease, box-shadow 150ms ease;
+    }
+    button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 7px 20px rgba(249, 115, 22, 0.45);
+    }
+    button:active {
+      transform: translateY(1px);
+      box-shadow: 0 3px 10px rgba(249, 115, 22, 0.4);
+    }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h1>💩 Flappy Turd</h1>
+    <canvas id="game" width="360" height="480" aria-label="Flappy Turd canvas"></canvas>
+    <div class="btn-row">
+      <p class="controls">
+        <strong>Controls:</strong>
+        <span>Space / Click / Tap to flap</span>
+      </p>
+      <button id="restart">Restart</button>
+    </div>
+    <p>
+      Keep the airborne turd soaring through sewer pipes. Each gate you clear is +1 point. Crash into pipes or the floor and it’s game over.
+    </p>
+    <small>Tip: short, rhythmic flaps keep things stable. Good luck, and may your turd fly proud.</small>
+  </main>
+
+  <script>
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    const restartBtn = document.getElementById('restart');
+
+    const WORLD = { width: canvas.width, height: canvas.height };
+    const GRAVITY = 0.35;
+    const FLAP = -6;
+    const PIPE_GAP = 130;
+    const PIPE_WIDTH = 60;
+    const PIPE_SPACING = 200;
+
+    let turd, pipes, score, highScore, particles;
+    let gameState = 'ready'; // 'ready' | 'running' | 'over'
+    let lastTime = 0;
+
+    const poop = new Image();
+    const poopReady = new Promise(resolve => {
+      poop.addEventListener('load', resolve, { once: true });
+    });
+    // Simple emoji sprite using data URL to avoid CORS
+    poop.src = 'data:image/svg+xml;utf8,' + encodeURIComponent(`
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+        <rect width="128" height="128" rx="24" fill="#4c2c15"/>
+        <path d="M65 18c-7 9-2 17-16 23s-18 20-18 31c0 18 16 33 35 33s35-15 35-33c0-10-4-23-17-28C71 38 75 25 65 18z" fill="#6b3b1f"/>
+        <ellipse cx="54" cy="71" rx="8" ry="10" fill="#fff"/>
+        <ellipse cx="82" cy="71" rx="8" ry="10" fill="#fff"/>
+        <circle cx="54" cy="71" r="4" fill="#000"/>
+        <circle cx="82" cy="71" r="4" fill="#000"/>
+        <path d="M48 94c6 6 25 6 32 0" stroke="#000" stroke-width="6" stroke-linecap="round" fill="none"/>
+        <ellipse cx="64" cy="112" rx="32" ry="10" fill="#311a0c" opacity="0.45"/>
+      </svg>
+    `);
+
+    function resetGame() {
+      turd = {
+        x: WORLD.width * 0.3,
+        y: WORLD.height / 2,
+        radius: 18,
+        vel: 0,
+        rotation: 0,
+      };
+      pipes = [];
+      particles = [];
+      score = 0;
+      gameState = 'ready';
+      spawnPipe();
+    }
+
+    function spawnPipe() {
+      const gapY = 70 + Math.random() * (WORLD.height - PIPE_GAP - 140);
+      const speed = 2 + Math.min(score * 0.05, 1.8); // speed ramps up slightly
+      pipes.push({
+        x: WORLD.width + PIPE_WIDTH,
+        gapY,
+        speed,
+        passed: false,
+      });
+    }
+
+    function flap() {
+      if (gameState === 'ready') {
+        gameState = 'running';
+      }
+      if (gameState !== 'running') return;
+      turd.vel = FLAP;
+      spawnParticles();
+    }
+
+    function spawnParticles() {
+      for (let i = 0; i < 6; i++) {
+        particles.push({
+          x: turd.x - turd.radius,
+          y: turd.y + turd.radius * 0.6,
+          vx: -1.5 - Math.random() * 1.5,
+          vy: (Math.random() - 0.5) * 1.5,
+          life: 30 + Math.random() * 20,
+        });
+      }
+    }
+
+    function update(delta) {
+      if (gameState === 'over') return;
+      if (gameState !== 'running') return;
+
+      turd.vel += GRAVITY;
+      turd.y += turd.vel;
+      turd.rotation = Math.atan2(turd.vel, 8);
+
+      if (turd.y + turd.radius > WORLD.height) {
+        turd.y = WORLD.height - turd.radius;
+        return gameOver();
+      }
+      if (turd.y - turd.radius < 0) {
+        turd.y = turd.radius;
+        turd.vel = 0;
+      }
+
+      pipes.forEach(pipe => {
+        pipe.x -= pipe.speed;
+        if (!pipe.passed && pipe.x + PIPE_WIDTH < turd.x - turd.radius) {
+          pipe.passed = true;
+          score += 1;
+          if (score % 5 === 0) spawnParticles();
+        }
+      });
+
+      if (pipes.length && pipes[0].x + PIPE_WIDTH < 0) {
+        pipes.shift();
+        spawnPipe();
+      }
+
+      for (const pipe of pipes) {
+        if (rectCircleCollide(turd, pipe)) {
+          return gameOver();
+        }
+      }
+
+      particles = particles.filter(p => {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life -= 1;
+        p.vy += 0.05;
+        return p.life > 0;
+      });
+    }
+
+    function rectCircleCollide(circle, pipe) {
+      const rects = [
+        { x: pipe.x, y: 0, width: PIPE_WIDTH, height: pipe.gapY },
+        { x: pipe.x, y: pipe.gapY + PIPE_GAP, width: PIPE_WIDTH, height: WORLD.height - (pipe.gapY + PIPE_GAP) },
+      ];
+
+      return rects.some(rect => {
+        const nearestX = Math.max(rect.x, Math.min(circle.x, rect.x + rect.width));
+        const nearestY = Math.max(rect.y, Math.min(circle.y, rect.y + rect.height));
+        const dx = circle.x - nearestX;
+        const dy = circle.y - nearestY;
+        return dx * dx + dy * dy <= circle.radius * circle.radius;
+      });
+    }
+
+    function gameOver() {
+      gameState = 'over';
+      highScore = Math.max(highScore, score);
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, WORLD.width, WORLD.height);
+      ctx.fillStyle = '#8cd230';
+      ctx.fillRect(0, WORLD.height - 20, WORLD.width, 20);
+
+      pipes.forEach(pipe => {
+        ctx.fillStyle = '#54472f';
+        ctx.fillRect(pipe.x, 0, PIPE_WIDTH, pipe.gapY);
+        ctx.fillRect(pipe.x, pipe.gapY + PIPE_GAP, PIPE_WIDTH, WORLD.height);
+
+        ctx.fillStyle = '#3d331f';
+        ctx.fillRect(pipe.x - 4, pipe.gapY - 14, PIPE_WIDTH + 8, 14);
+        ctx.fillRect(pipe.x - 4, pipe.gapY + PIPE_GAP, PIPE_WIDTH + 8, 14);
+      });
+
+      particles.forEach(p => {
+        ctx.globalAlpha = Math.max(p.life / 40, 0);
+        ctx.fillStyle = '#b67a2a';
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      });
+
+      ctx.save();
+      ctx.translate(turd.x, turd.y);
+      ctx.rotate(turd.rotation);
+      ctx.drawImage(poop, -turd.radius * 1.2, -turd.radius * 1.2, turd.radius * 2.4, turd.radius * 2.4);
+      ctx.restore();
+
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 24px "Inter", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(`Score: ${score}`, WORLD.width / 2, 40);
+      ctx.font = '16px "Inter", sans-serif';
+      ctx.fillText(`Best: ${highScore}`, WORLD.width / 2, 65);
+
+      if (gameState === 'ready') {
+        drawOverlay('Click / tap / space to start');
+      } else if (gameState === 'over') {
+        drawOverlay('SPLAT! Press space or click to retry');
+      }
+    }
+
+    function drawOverlay(text) {
+      ctx.fillStyle = 'rgba(0,0,0,0.45)';
+      ctx.fillRect(30, WORLD.height / 2 - 40, WORLD.width - 60, 80);
+      ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+      ctx.strokeRect(30, WORLD.height / 2 - 40, WORLD.width - 60, 80);
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 18px "Inter", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(text, WORLD.width / 2, WORLD.height / 2 + 6);
+    }
+
+    function loop(timestamp) {
+      const delta = timestamp - lastTime;
+      lastTime = timestamp;
+      update(delta);
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    async function init() {
+      highScore = parseInt(localStorage.getItem('flappyTurdHighScore') || '0', 10);
+      await poopReady;
+      resetGame();
+      requestAnimationFrame(loop);
+    }
+
+    canvas.addEventListener('pointerdown', flap);
+    canvas.addEventListener('pointerup', e => e.preventDefault());
+    window.addEventListener('keydown', e => {
+      if (e.code === 'Space') {
+        e.preventDefault();
+        if (gameState === 'over') {
+          resetGame();
+        }
+        flap();
+      }
+      if (e.code === 'KeyR') {
+        e.preventDefault();
+        resetGame();
+      }
+    });
+
+    restartBtn.addEventListener('click', () => {
+      resetGame();
+      gameState = 'running';
+      turd.vel = FLAP;
+    });
+
+    window.addEventListener('click', () => {
+      if (gameState === 'over') {
+        resetGame();
+        gameState = 'running';
+        turd.vel = FLAP;
+      }
+    });
+
+    window.addEventListener('blur', () => {
+      if (gameState === 'running') {
+        gameState = 'ready';
+      }
+    });
+
+    setInterval(() => {
+      if (gameState === 'over') return;
+      highScore = Math.max(highScore, score);
+      localStorage.setItem('flappyTurdHighScore', String(highScore));
+    }, 2000);
+
+    init();
+  </script>
+</body>
+</html>

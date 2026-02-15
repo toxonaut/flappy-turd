@@ -1,0 +1,15 @@
+{
+  "name": "flappy-turd",
+  "version": "1.0.0",
+  "description": "A silly Flappy Bird clone starring a heroic turd.",
+  "type": "module",
+  "scripts": {
+    "dev": "node server.mjs --port 5173",
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "compression": "^1.7.4",
+    "express": "^4.19.2",
+    "serve-static": "^1.15.0"
+  }
+}
