@@ -20,51 +20,52 @@
       justify-content: center;
       background: radial-gradient(circle at 20% 20%, #3a2f3d, #120b18) fixed;
       color: #f4f1f0;
+      padding: 1rem;
     }
     .card {
-      width: min(520px, 100%);
-      padding: 1.5rem;
-      background: rgba(16, 12, 22, 0.8);
+      width: min(620px, 100%);
+      padding: 1.75rem;
+      background: rgba(16, 12, 22, 0.85);
       border: 1px solid rgba(255, 255, 255, 0.05);
-      border-radius: 18px;
+      border-radius: 22px;
       box-shadow:
-        0 10px 50px rgba(0, 0, 0, 0.35),
-        inset 0 0 20px rgba(255, 255, 255, 0.02);
-      backdrop-filter: blur(8px);
+        0 25px 60px rgba(0, 0, 0, 0.45),
+        inset 0 0 30px rgba(255, 255, 255, 0.02);
+      backdrop-filter: blur(12px);
     }
     h1 {
       margin: 0 0 0.5rem;
-      font-size: clamp(1.8rem, 2vw, 2.2rem);
+      font-size: clamp(2rem, 3vw, 2.8rem);
       letter-spacing: 0.04em;
-      text-shadow: 0 4px 16px rgba(0,0,0,0.5);
+      text-shadow: 0 4px 16px rgba(0,0,0,0.55);
     }
     canvas {
       width: 100%;
-      aspect-ratio: 3 / 4;
-      border-radius: 12px;
-      background: linear-gradient(#66c5ff, #9ee0ff 40%, #9ee0ff 60%, #8cd230);
+      aspect-ratio: 21 / 32;
+      border-radius: 18px;
+      background: linear-gradient(#65c8ff, #8fe5ff 45%, #9ae890 60%, #7dc262);
       display: block;
-      margin: 1rem 0;
-      border: 1px solid rgba(0, 0, 0, 0.15);
-      box-shadow: inset 0 4px 18px rgba(0,0,0,0.25);
+      margin: 1.25rem 0;
+      border: 1px solid rgba(0, 0, 0, 0.2);
+      box-shadow: inset 0 6px 24px rgba(0,0,0,0.35);
       image-rendering: pixelated;
       cursor: pointer;
       touch-action: manipulation;
     }
     p {
-      margin: 0.25rem 0;
-      line-height: 1.5;
-      font-size: 0.95rem;
+      margin: 0.35rem 0;
+      line-height: 1.6;
+      font-size: 1rem;
     }
     small {
       opacity: 0.75;
-      font-size: 0.8rem;
+      font-size: 0.85rem;
     }
     .controls {
       display: flex;
       flex-wrap: wrap;
       gap: 0.4rem 1rem;
-      font-size: 0.9rem;
+      font-size: 0.95rem;
       opacity: 0.85;
     }
     .btn-row {
@@ -77,29 +78,29 @@
     button {
       border: none;
       border-radius: 999px;
-      padding: 0.5rem 1rem;
-      font-size: 0.9rem;
+      padding: 0.55rem 1.25rem;
+      font-size: 0.95rem;
       font-weight: 600;
-      background: #f97316;
+      background: linear-gradient(135deg, #fca311, #f97316);
       color: #fff;
       cursor: pointer;
-      box-shadow: 0 5px 15px rgba(249, 115, 22, 0.35);
+      box-shadow: 0 5px 18px rgba(249, 115, 22, 0.4);
       transition: transform 150ms ease, box-shadow 150ms ease;
     }
     button:hover {
       transform: translateY(-1px);
-      box-shadow: 0 7px 20px rgba(249, 115, 22, 0.45);
+      box-shadow: 0 9px 22px rgba(249, 115, 22, 0.5);
     }
     button:active {
       transform: translateY(1px);
-      box-shadow: 0 3px 10px rgba(249, 115, 22, 0.4);
+      box-shadow: 0 4px 12px rgba(249, 115, 22, 0.45);
     }
   </style>
 </head>
 <body>
   <main class="card">
     <h1>💩 Flappy Turd</h1>
-    <canvas id="game" width="360" height="480" aria-label="Flappy Turd canvas"></canvas>
+    <canvas id="game" width="420" height="640" aria-label="Flappy Turd canvas"></canvas>
     <div class="btn-row">
       <p class="controls">
         <strong>Controls:</strong>
@@ -108,9 +109,9 @@
       <button id="restart">Restart</button>
     </div>
     <p>
-      Keep the airborne turd soaring through sewer pipes. Each gate you clear is +1 point. Crash into pipes or the floor and it’s game over.
+      Larger pipes, calmer gravity, and a more realistic swirl make this version way more forgiving. Float your majestic turd through the sewer vents, rack up points, and try to keep things… tidy.
     </p>
-    <small>Tip: short, rhythmic flaps keep things stable. Good luck, and may your turd fly proud.</small>
+    <small>Tip: gentle, rhythmic taps keep altitude. Holding space is a recipe for splat.</small>
   </main>
 
   <script>
@@ -119,11 +120,15 @@
     const restartBtn = document.getElementById('restart');
 
     const WORLD = { width: canvas.width, height: canvas.height };
-    const GRAVITY = 0.35;
-    const FLAP = -6;
-    const PIPE_GAP = 130;
-    const PIPE_WIDTH = 60;
-    const PIPE_SPACING = 200;
+    const FLOOR_HEIGHT = 40;
+    const GRAVITY = 0.24;
+    const FLAP = -5.4;
+    const PIPE_GAP = 180;
+    const PIPE_WIDTH = 70;
+    const PIPE_SPACING = 260;
+    const BASE_SPEED = 1.6;
+    const SPEED_RAMP = 0.035;
+    const MAX_SPEED = 2.6;
 
     let turd, pipes, score, highScore, particles;
     let gameState = 'ready'; // 'ready' | 'running' | 'over'
@@ -133,17 +138,33 @@
     const poopReady = new Promise(resolve => {
       poop.addEventListener('load', resolve, { once: true });
     });
-    // Simple emoji sprite using data URL to avoid CORS
+    // Hand-drawn poop swirl sprite (SVG data URL)
     poop.src = 'data:image/svg+xml;utf8,' + encodeURIComponent(`
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-        <rect width="128" height="128" rx="24" fill="#4c2c15"/>
-        <path d="M65 18c-7 9-2 17-16 23s-18 20-18 31c0 18 16 33 35 33s35-15 35-33c0-10-4-23-17-28C71 38 75 25 65 18z" fill="#6b3b1f"/>
-        <ellipse cx="54" cy="71" rx="8" ry="10" fill="#fff"/>
-        <ellipse cx="82" cy="71" rx="8" ry="10" fill="#fff"/>
-        <circle cx="54" cy="71" r="4" fill="#000"/>
-        <circle cx="82" cy="71" r="4" fill="#000"/>
-        <path d="M48 94c6 6 25 6 32 0" stroke="#000" stroke-width="6" stroke-linecap="round" fill="none"/>
-        <ellipse cx="64" cy="112" rx="32" ry="10" fill="#311a0c" opacity="0.45"/>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+        <defs>
+          <radialGradient id="poopShade" cx="50%" cy="30%" r="70%">
+            <stop offset="0%" stop-color="#7a4926" />
+            <stop offset="55%" stop-color="#5b3314" />
+            <stop offset="95%" stop-color="#2b1407" />
+          </radialGradient>
+          <linearGradient id="poopGloss" x1="20%" x2="60%" y1="20%" y2="60%">
+            <stop offset="0%" stop-color="#fff" stop-opacity="0.4"/>
+            <stop offset="80%" stop-color="#fff" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        <rect width="200" height="200" rx="36" fill="#1b130e"/>
+        <g filter="url(#shadow)">
+          <path d="M78 56c-10 12-4 20-22 28s-24 24-24 39c0 23 21 41 48 41s48-18 48-41c0-12-6-29-24-35 8-7 11-22-4-32s-20-3-22 0z" fill="url(#poopShade)"/>
+          <path d="M126 66c4 8 2 17-5 23c15 4 32 18 32 42c0 27-24 49-54 49s-54-22-54-49" fill="none" stroke="#2d1809" stroke-width="10" stroke-linecap="round"/>
+          <path d="M86 82c-6 10-5 19-22 23" stroke="#2f180a" stroke-width="9" stroke-linecap="round"/>
+          <ellipse cx="96" cy="150" rx="52" ry="18" fill="#000" opacity="0.25"/>
+        </g>
+        <ellipse cx="86" cy="102" rx="12" ry="14" fill="#fff" opacity="0.9"/>
+        <ellipse cx="116" cy="102" rx="12" ry="14" fill="#fff" opacity="0.9"/>
+        <circle cx="86" cy="102" r="6" fill="#0a0502"/>
+        <circle cx="116" cy="102" r="6" fill="#0a0502"/>
+        <path d="M82 132c8 7 28 7 36 0" stroke="#160b05" stroke-width="8" stroke-linecap="round" fill="none"/>
+        <path d="M92 70c-10-3-18 0-26 9" stroke="url(#poopGloss)" stroke-width="8" stroke-linecap="round"/>
       </svg>
     `);
 
@@ -151,7 +172,7 @@
       turd = {
         x: WORLD.width * 0.3,
         y: WORLD.height / 2,
-        radius: 18,
+        radius: 22,
         vel: 0,
         rotation: 0,
       };
@@ -159,14 +180,17 @@
       particles = [];
       score = 0;
       gameState = 'ready';
+      spawnPipe(true);
       spawnPipe();
     }
 
-    function spawnPipe() {
-      const gapY = 70 + Math.random() * (WORLD.height - PIPE_GAP - 140);
-      const speed = 2 + Math.min(score * 0.05, 1.8); // speed ramps up slightly
+    function spawnPipe(initial = false) {
+      const lastX = pipes.length ? pipes[pipes.length - 1].x : WORLD.width;
+      const spawnX = initial ? WORLD.width + 200 : Math.max(lastX + PIPE_SPACING, WORLD.width + PIPE_WIDTH);
+      const gapY = 90 + Math.random() * (WORLD.height - FLOOR_HEIGHT - PIPE_GAP - 160);
+      const speed = Math.min(BASE_SPEED + score * SPEED_RAMP, MAX_SPEED);
       pipes.push({
-        x: WORLD.width + PIPE_WIDTH,
+        x: spawnX,
         gapY,
         speed,
         passed: false,
@@ -183,27 +207,28 @@
     }
 
     function spawnParticles() {
-      for (let i = 0; i < 6; i++) {
+      const count = 5;
+      for (let i = 0; i < count; i++) {
         particles.push({
-          x: turd.x - turd.radius,
-          y: turd.y + turd.radius * 0.6,
-          vx: -1.5 - Math.random() * 1.5,
-          vy: (Math.random() - 0.5) * 1.5,
-          life: 30 + Math.random() * 20,
+          x: turd.x - turd.radius * 0.6,
+          y: turd.y + turd.radius * 0.5,
+          vx: -1 - Math.random() * 1.2,
+          vy: (Math.random() - 0.5) * 1.1,
+          life: 40 + Math.random() * 30,
+          size: 3 + Math.random() * 3,
         });
       }
     }
 
-    function update(delta) {
-      if (gameState === 'over') return;
+    function update() {
       if (gameState !== 'running') return;
 
       turd.vel += GRAVITY;
       turd.y += turd.vel;
-      turd.rotation = Math.atan2(turd.vel, 8);
+      turd.rotation = Math.atan2(turd.vel, 10);
 
-      if (turd.y + turd.radius > WORLD.height) {
-        turd.y = WORLD.height - turd.radius;
+      if (turd.y + turd.radius > WORLD.height - FLOOR_HEIGHT) {
+        turd.y = WORLD.height - FLOOR_HEIGHT - turd.radius;
         return gameOver();
       }
       if (turd.y - turd.radius < 0) {
@@ -216,11 +241,11 @@
         if (!pipe.passed && pipe.x + PIPE_WIDTH < turd.x - turd.radius) {
           pipe.passed = true;
           score += 1;
-          if (score % 5 === 0) spawnParticles();
+          if (score % 4 === 0) spawnParticles();
         }
       });
 
-      if (pipes.length && pipes[0].x + PIPE_WIDTH < 0) {
+      if (pipes.length && pipes[0].x + PIPE_WIDTH < -20) {
         pipes.shift();
         spawnPipe();
       }
@@ -235,18 +260,20 @@
         p.x += p.vx;
         p.y += p.vy;
         p.life -= 1;
-        p.vy += 0.05;
+        p.vy += 0.015;
         return p.life > 0;
       });
     }
 
     function rectCircleCollide(circle, pipe) {
-      const rects = [
-        { x: pipe.x, y: 0, width: PIPE_WIDTH, height: pipe.gapY },
-        { x: pipe.x, y: pipe.gapY + PIPE_GAP, width: PIPE_WIDTH, height: WORLD.height - (pipe.gapY + PIPE_GAP) },
-      ];
-
-      return rects.some(rect => {
+      const topRect = { x: pipe.x, y: 0, width: PIPE_WIDTH, height: pipe.gapY };
+      const bottomRect = {
+        x: pipe.x,
+        y: pipe.gapY + PIPE_GAP,
+        width: PIPE_WIDTH,
+        height: WORLD.height - (pipe.gapY + PIPE_GAP),
+      };
+      return [topRect, bottomRect].some(rect => {
         const nearestX = Math.max(rect.x, Math.min(circle.x, rect.x + rect.width));
         const nearestY = Math.max(rect.y, Math.min(circle.y, rect.y + rect.height));
         const dx = circle.x - nearestX;
@@ -258,67 +285,99 @@
     function gameOver() {
       gameState = 'over';
       highScore = Math.max(highScore, score);
+      localStorage.setItem('flappyTurdHighScore', String(highScore));
+    }
+
+    function drawBackground() {
+      const horizon = WORLD.height * 0.55;
+      const gradient = ctx.createLinearGradient(0, 0, 0, horizon);
+      gradient.addColorStop(0, '#7fd3ff');
+      gradient.addColorStop(1, '#c8f7ff');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, WORLD.width, horizon);
+
+      ctx.fillStyle = '#7dc262';
+      ctx.fillRect(0, horizon, WORLD.width, WORLD.height - horizon - FLOOR_HEIGHT);
+      ctx.fillStyle = '#4d5620';
+      ctx.fillRect(0, WORLD.height - FLOOR_HEIGHT, WORLD.width, FLOOR_HEIGHT);
+    }
+
+    function drawPipes() {
+      pipes.forEach(pipe => {
+        const topHeight = pipe.gapY;
+        const bottomY = pipe.gapY + PIPE_GAP;
+        ctx.fillStyle = '#4d3a24';
+        ctx.fillRect(pipe.x, 0, PIPE_WIDTH, topHeight);
+        ctx.fillRect(pipe.x, bottomY, PIPE_WIDTH, WORLD.height - bottomY);
+
+        ctx.fillStyle = '#2f2415';
+        ctx.fillRect(pipe.x - 5, topHeight - 16, PIPE_WIDTH + 10, 16);
+        ctx.fillRect(pipe.x - 5, bottomY, PIPE_WIDTH + 10, 16);
+      });
+    }
+
+    function drawTurd() {
+      ctx.save();
+      ctx.translate(turd.x, turd.y);
+      ctx.rotate(turd.rotation);
+      ctx.drawImage(poop, -turd.radius * 1.4, -turd.radius * 1.4, turd.radius * 2.8, turd.radius * 2.8);
+      ctx.restore();
+    }
+
+    function drawParticles() {
+      particles.forEach(p => {
+        ctx.globalAlpha = Math.max(p.life / 50, 0);
+        ctx.fillStyle = '#b7813a';
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      });
+    }
+
+    function drawHUD() {
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 30px "Inter", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(`Score: ${score}`, WORLD.width / 2, 48);
+      ctx.font = '18px "Inter", sans-serif';
+      ctx.fillText(`Best: ${highScore}`, WORLD.width / 2, 78);
+    }
+
+    function drawOverlay(text, subtext) {
+      ctx.fillStyle = 'rgba(0,0,0,0.45)';
+      ctx.fillRect(40, WORLD.height / 2 - 70, WORLD.width - 80, 140);
+      ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(40, WORLD.height / 2 - 70, WORLD.width - 80, 140);
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 24px "Inter", sans-serif';
+      ctx.fillText(text, WORLD.width / 2, WORLD.height / 2 - 10);
+      ctx.font = '16px "Inter", sans-serif';
+      ctx.fillText(subtext, WORLD.width / 2, WORLD.height / 2 + 30);
     }
 
     function draw() {
       ctx.clearRect(0, 0, WORLD.width, WORLD.height);
-      ctx.fillStyle = '#8cd230';
-      ctx.fillRect(0, WORLD.height - 20, WORLD.width, 20);
-
-      pipes.forEach(pipe => {
-        ctx.fillStyle = '#54472f';
-        ctx.fillRect(pipe.x, 0, PIPE_WIDTH, pipe.gapY);
-        ctx.fillRect(pipe.x, pipe.gapY + PIPE_GAP, PIPE_WIDTH, WORLD.height);
-
-        ctx.fillStyle = '#3d331f';
-        ctx.fillRect(pipe.x - 4, pipe.gapY - 14, PIPE_WIDTH + 8, 14);
-        ctx.fillRect(pipe.x - 4, pipe.gapY + PIPE_GAP, PIPE_WIDTH + 8, 14);
-      });
-
-      particles.forEach(p => {
-        ctx.globalAlpha = Math.max(p.life / 40, 0);
-        ctx.fillStyle = '#b67a2a';
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.globalAlpha = 1;
-      });
-
-      ctx.save();
-      ctx.translate(turd.x, turd.y);
-      ctx.rotate(turd.rotation);
-      ctx.drawImage(poop, -turd.radius * 1.2, -turd.radius * 1.2, turd.radius * 2.4, turd.radius * 2.4);
-      ctx.restore();
-
-      ctx.fillStyle = '#fff';
-      ctx.font = 'bold 24px "Inter", sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(`Score: ${score}`, WORLD.width / 2, 40);
-      ctx.font = '16px "Inter", sans-serif';
-      ctx.fillText(`Best: ${highScore}`, WORLD.width / 2, 65);
+      drawBackground();
+      drawPipes();
+      drawParticles();
+      drawTurd();
+      drawHUD();
 
       if (gameState === 'ready') {
-        drawOverlay('Click / tap / space to start');
+        drawOverlay('Tap / click / press space to flap', 'The sewer breeze is gentle now.');
       } else if (gameState === 'over') {
-        drawOverlay('SPLAT! Press space or click to retry');
+        drawOverlay('SPLAT! Press space to retry', 'You can do better than that.');
       }
-    }
-
-    function drawOverlay(text) {
-      ctx.fillStyle = 'rgba(0,0,0,0.45)';
-      ctx.fillRect(30, WORLD.height / 2 - 40, WORLD.width - 60, 80);
-      ctx.strokeStyle = 'rgba(255,255,255,0.35)';
-      ctx.strokeRect(30, WORLD.height / 2 - 40, WORLD.width - 60, 80);
-      ctx.fillStyle = '#fff';
-      ctx.font = 'bold 18px "Inter", sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(text, WORLD.width / 2, WORLD.height / 2 + 6);
     }
 
     function loop(timestamp) {
       const delta = timestamp - lastTime;
       lastTime = timestamp;
-      update(delta);
+      if (delta < 1000) {
+        update(delta);
+      }
       draw();
       requestAnimationFrame(loop);
     }
@@ -343,6 +402,8 @@
       if (e.code === 'KeyR') {
         e.preventDefault();
         resetGame();
+        gameState = 'running';
+        turd.vel = FLAP;
       }
     });
 
@@ -365,12 +426,6 @@
         gameState = 'ready';
       }
     });
-
-    setInterval(() => {
-      if (gameState === 'over') return;
-      highScore = Math.max(highScore, score);
-      localStorage.setItem('flappyTurdHighScore', String(highScore));
-    }, 2000);
 
     init();
   </script>
